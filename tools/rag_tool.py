@@ -1,5 +1,3 @@
-import chromadb
-from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any, Optional
 from config.settings import Settings
 
@@ -9,18 +7,35 @@ class RAGRetrieverTool:
 
     def __init__(self, settings: Optional[Settings] = None):
         self.settings = settings or Settings()
-        self._client = chromadb.PersistentClient(path=self.settings.chroma_persist_dir)
-        self._collection = self._client.get_or_create_collection(
-            name=self.settings.chroma_collection,
-            metadata={"hnsw:space": "cosine"}
-        )
-        self._embedding_model = SentenceTransformer(self.settings.embedding_model)
+        self._client = None
+        self._collection = None
+        self._embedding_model = None
+        self._ready = False
+
+    def _init_once(self):
+        if self._ready:
+            return True
+        try:
+            import chromadb
+            from sentence_transformers import SentenceTransformer
+            self._client = chromadb.PersistentClient(path=self.settings.chroma_persist_dir)
+            self._collection = self._client.get_or_create_collection(
+                name=self.settings.chroma_collection,
+                metadata={"hnsw:space": "cosine"}
+            )
+            self._embedding_model = SentenceTransformer(self.settings.embedding_model)
+            self._ready = True
+            return True
+        except Exception as e:
+            print(f"RAG init failed: {e}")
+            return False
 
     def _embed(self, texts: List[str]) -> List[List[float]]:
         return self._embedding_model.encode(texts).tolist()
 
     def index_documents(self, documents: List[Dict[str, str]]) -> int:
-        """索引文档到向量库。每个文档需含 id, content, metadata。"""
+        if not self._init_once():
+            return 0
         ids = [doc["id"] for doc in documents]
         contents = [doc["content"] for doc in documents]
         metadatas = [doc.get("metadata", {}) for doc in documents]
@@ -37,7 +52,8 @@ class RAGRetrieverTool:
         return len(ids)
 
     def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        """语义检索最相关的文档。"""
+        if not self._init_once():
+            return []
         q_emb = self._embed([query])
         results = self._collection.query(
             query_embeddings=q_emb,
@@ -50,12 +66,11 @@ class RAGRetrieverTool:
                 "id": results["ids"][0][i],
                 "content": results["documents"][0][i],
                 "metadata": results["metadatas"][0][i],
-                "score": 1 - results["distances"][0][i],  # cosine similarity
+                "score": 1 - results["distances"][0][i],
             })
         return docs
 
     def build_context(self, query: str, top_k: int = 5) -> str:
-        """构建RAG上下文字符串。"""
         results = self.search(query, top_k)
         if not results:
             return "[知识库中未找到相关信息]"
@@ -66,4 +81,6 @@ class RAGRetrieverTool:
         return "\n\n---\n\n".join(parts)
 
     def stats(self) -> Dict[str, int]:
+        if not self._init_once():
+            return {"collection": self.settings.chroma_collection, "count": 0}
         return {"collection": self.settings.chroma_collection, "count": self._collection.count()}

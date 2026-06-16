@@ -2,8 +2,14 @@ import streamlit as st
 import time
 import json
 from datetime import datetime
-from config.settings import Settings
-from agents.workflow import ResearchWorkflow
+
+
+@st.cache_resource
+def load_workflow():
+    from config.settings import Settings
+    from agents.workflow import ResearchWorkflow
+    settings = Settings()
+    return ResearchWorkflow(settings)
 
 
 st.set_page_config(
@@ -68,8 +74,6 @@ def render_header():
 def render_sidebar():
     with st.sidebar:
         st.markdown("## 系统配置")
-
-        settings = Settings()
 
         st.markdown("### 智能体架构")
         st.markdown("""
@@ -161,8 +165,7 @@ def render_plan(plan):
 
 
 def run_research(topic: str):
-    settings = Settings()
-    workflow = ResearchWorkflow(settings)
+    workflow = load_workflow()
 
     progress_bar = st.progress(0)
     status_text = st.empty()
