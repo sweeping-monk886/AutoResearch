@@ -1,221 +1,108 @@
-# AutoResearch — 基于多智能体协作的深度研究助手
+# AutoResearch
 
-一个能自主完成深度研究报告的多智能体系统。用户只需输入研究主题（如"Transformer在自动驾驶中的最新应用"），系统即可自动规划、检索、分析、综合并生成一份结构完整的专业研究报告。
+做一个能自己做研究的AI Agent系统。给它一个主题，它会自己搜资料、读论文、分析整理、最后写成一份完整的研究报告。
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
-![LangGraph](https://img.shields.io/badge/LangGraph-0.1+-red)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-green?logo=streamlit)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+一开始是想偷懒，每次看论文太费时间了，后来做着做着发现多Agent协作这块挺有意思的，就往深了做。
 
-## 系统架构
+## 它能干嘛
+
+输入一个研究主题，比如"Transformer在自动驾驶中的应用"，系统会：
+
+1. 先拆解任务——要查哪些方面、用什么关键词搜
+2. 同时从网络、ArXiv论文库、本地知识库三个渠道找资料
+3. 对找到的内容做分析，提取关键信息
+4. 最后把这些内容整理成一份有结构的研究报告，带参考文献
+
+整个过程你能在网页上看到每个Agent在干什么。
+
+## 架构
+
+大概就是这么个流程：
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    用户输入研究主题                       │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│               PlannerAgent (规划智能体)                  │
-│         • 任务分解  • 制定计划  • 反思优化                │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-     ┌─────────────────┼─────────────────┐
-     │                 │                 │
-┌────▼────┐      ┌─────▼─────┐     ┌─────▼─────┐
-│Retriever│      │  Analyst  │     │  Analyst  │
-│ Agent   │      │   Agent   │     │   Agent   │
-│ 网络检索 │      │  深度分析  │     │  逻辑推理  │
-│ ArXiv   │      │  数据处理  │     │  对比总结  │
-│ RAG     │      │           │     │           │
-└────┬────┘      └─────┬─────┘     └─────┬─────┘
-     │                 │                 │
-     └─────────────────┼─────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│               WriterAgent (写作智能体)                   │
-│         • 整合信息  • 结构化报告  • 引用管理              │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│                  生成完整研究报告                         │
-└─────────────────────────────────────────────────────────┘
+用户输入主题
+    ↓
+PlannerAgent (拆任务、做计划、把控质量)
+    ↓
+RetrieverAgent ← → AnalystAgent
+  (搜资料)         (分析整理)
+    ↓
+WriterAgent (写报告)
+    ↓
+输出研究报告
 ```
+
+Planner是总指挥，负责把任务分下去，还要检查其他Agent干得怎么样，不行就让它们重做。
 
 ## 技术栈
 
-| 类别 | 技术 |
-|------|------|
-| 核心框架 | LangGraph (工作流编排) |
-| 大模型 | OpenAI / Qwen / DeepSeek API |
-| 向量数据库 | ChromaDB |
-| 嵌入模型 | Sentence-Transformers (all-MiniLM-L6-v2) |
-| 网络搜索 | DuckDuckGo API |
-| 学术检索 | ArXiv API |
-| Web界面 | Streamlit |
-| 语言 | Python 3.10+ |
+- **LangGraph** — 工作流编排，用状态机控制Agent之间的流转
+- **ChromaDB** — 向量数据库，做本地知识库的语义检索
+- **Sentence-Transformers** — 文本嵌入，用的 `all-MiniLM-L6-v2`
+- **DuckDuckGo** — 网络搜索，不需要API key
+- **ArXiv API** — 搜学术论文
+- **Streamlit** — 前端界面，写起来快
+- **Python**
 
-## 核心功能
-
-1. **智能任务规划** — PlannerAgent 自动分解研究主题为可执行子任务
-2. **多源信息检索** — 支持网络搜索、ArXiv学术论文、本地知识库RAG
-3. **深度内容分析** — AnalystAgent 进行文本分析、关键发现提取
-4. **自动化报告生成** — WriterAgent 整合所有信息生成结构化报告
-5. **反思与优化** — 系统自动评估报告质量并进行迭代优化
-6. **可视化工作流** — 实时展示多智能体协作过程
-
-## 快速开始
-
-### 1. 克隆项目
+## 跑起来
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/AutoResearch.git
+git clone https://github.com/sweeping-monk886/AutoResearch.git
 cd AutoResearch
-```
-
-### 2. 创建虚拟环境
-
-```bash
 python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# macOS/Linux
-source venv/bin/activate
-```
-
-### 3. 安装依赖
-
-```bash
+venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-```
-
-### 4. 配置环境变量
-
-```bash
-cp .env.example .env
-# 编辑 .env 填入你的 API Key
-```
-
-### 5. 启动应用
-
-```bash
-# 方式一：直接启动
 streamlit run app.py
-
-# 方式二：通过主入口
-python main.py
 ```
 
-浏览器自动打开 `http://localhost:8501`
+浏览器会自动打开 `http://localhost:8501`。
+
+如果你想接自己的大模型API（比如OpenAI或DeepSeek），在项目根目录创建 `.env` 文件：
+
+```
+OPENAI_API_KEY=你的key
+OPENAI_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
+```
+
+不接也行，系统会用模板模式跑，能演示整个流程，只是分析质量差一些。
 
 ## 项目结构
 
 ```
 AutoResearch/
-├── app.py                  # Streamlit Web界面
-├── main.py                 # 主入口
-├── config/
-│   ├── __init__.py
-│   └── settings.py         # 全局配置
+├── app.py              # Streamlit界面，主要入口
+├── main.py             # 命令行启动脚本
 ├── agents/
-│   ├── __init__.py
-│   ├── planner.py          # 规划智能体
-│   ├── retriever.py        # 检索智能体
-│   ├── analyst.py          # 分析智能体
-│   ├── writer.py           # 写作智能体
-│   └── workflow.py         # LangGraph工作流
+│   ├── planner.py      # 规划Agent，任务分解+反思
+│   ├── retriever.py    # 检索Agent，网络+论文+RAG
+│   ├── analyst.py      # 分析Agent，文本分析+代码执行
+│   ├── writer.py       # 写作Agent，报告生成
+│   └── workflow.py     # 整个工作流的状态机
 ├── tools/
-│   ├── __init__.py
-│   ├── search_tool.py      # 网络搜索工具
-│   ├── rag_tool.py         # RAG检索工具
-│   └── analysis_tool.py    # 分析工具
-├── utils/
-│   └── __init__.py
+│   ├── search_tool.py  # 搜索工具（DuckDuckGo + ArXiv）
+│   ├── rag_tool.py     # ChromaDB向量检索
+│   └── analysis_tool.py # 文本分析+安全代码沙箱
+├── config/
+│   └── settings.py     # 配置文件
 ├── requirements.txt
-├── .env.example
-├── .gitignore
-└── README.md
+└── .env.example
 ```
 
-## 面试展示要点
+## 做的过程中遇到的一些坑
 
-### 技术亮点
+**Agent幻觉问题**：一开始Retriever搜回来的内容，Analyst分析的时候会自己编造一些不存在的数据。后来加了RAG作为事实校验，好了一些，但不能完全解决。
 
-1. **Agent架构设计**: 主从式多智能体协作，Planner-Worker模式
-2. **RAG技术**: ChromaDB向量数据库 + Sentence-Transformers嵌入 + 语义检索
-3. **工作流编排**: 基于LangGraph的状态机设计，支持条件分支和反思循环
-4. **多源检索**: 网络搜索 + ArXiv学术检索 + 本地知识库三路融合
-5. **Prompt工程**: 为每个Agent设计专用System Prompt
-6. **反思机制**: PlannerAgent对报告质量进行自动评估和迭代优化
+**Agent之间的协调**：最开始想让Agent互相通信，后来发现太复杂了，改成Planner统一调度，简单很多。状态机虽然不够灵活，但至少不会死锁。
 
-### 设计决策
+**搜索结果质量**：DuckDuckGo搜出来的结果参差不齐，有些网页内容很水。后来加了网页正文抓取，过滤掉了纯标题党和导航页。
 
-- **为什么选LangGraph**: 相比纯LangChain，LangGraph提供更灵活的状态管理和条件流转
-- **为什么用ChromaDB**: 轻量级本地部署，无需外部服务，适合原型验证
-- **为什么三路检索**: 覆盖时效性(网络)、权威性(ArXiv)、私有知识(RAG)
+**ChromaDB首次加载慢**：第一次跑的时候Sentence-Transformers要下载模型，大概100多MB，之后就快了。
 
-### 遇到的挑战与解决方案
+## 截图
 
-1. **Agent幻觉**: 通过RAG提供事实依据，减少虚构内容
-2. **协调死锁**: 使用状态机明确流转条件，避免循环依赖
-3. **信息过载**: 在检索阶段设置Top-K限制，分析阶段聚焦关键信息
-
-## 部署到 GitHub
-
-### 步骤 1: 创建 GitHub 仓库
-
-1. 登录 GitHub，点击右上角 `+` → `New repository`
-2. 仓库名: `AutoResearch`
-3. 描述: `基于多智能体协作的深度研究助手`
-4. 选择 **Public**
-5. 不要初始化 README（我们本地已有）
-6. 点击 `Create repository`
-
-### 步骤 2: 推送代码
-
-```bash
-cd AutoResearch
-git init
-git add .
-git commit -m "feat: 初始化AutoResearch多智能体研究助手"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/AutoResearch.git
-git push -u origin main
-```
-
-### 步骤 3: 部署到 HuggingFace Spaces (免费在线访问)
-
-1. 注册 [HuggingFace](https://huggingface.co) 账号
-2. 点击 `New Space`
-3. 选择 `Streamlit` 作为 SDK
-4. 设置 Space 名称为 `AutoResearch`
-5. 在 Settings → Repository secrets 中添加 `OPENAI_API_KEY`
-6. 上传项目文件或连接 GitHub 仓库
-7. Space 会自动构建并部署
-
-### 步骤 4: 添加 GitHub Topics
-
-在仓库 Settings → General → Topics 中添加：
-
-```
-ai-agent multi-agent rag langchain langgraph streamlit research assistant
-```
-
-## 使用示例
-
-输入研究主题后，系统会自动：
-
-1. **规划阶段**: 分解为 6 个子任务（背景检索、论文检索、技术分析、应用分析、趋势分析、对比总结）
-2. **检索阶段**: 从网络、ArXiv、本地知识库三路检索信息
-3. **分析阶段**: 对检索结果进行深度分析，提取关键发现
-4. **反思阶段**: 评估信息充分性，必要时补充检索
-5. **写作阶段**: 生成包含摘要、背景、技术现状、关键发现、对比分析、趋势、结论、参考文献的完整报告
+<!-- TODO: 加一张界面截图 -->
 
 ## License
 
-MIT License
-
-## 作者
-
-你的名字 — 你的GitHub主页链接
+MIT
