@@ -1,6 +1,6 @@
 # AutoResearch
 
-做一个能自己做研究的AI Agent系统。给它一个主题，它会自己搜资料、读论文、分析整理、最后写成一份完整的研究报告。
+一个能自己做研究的AI Agent系统。给它一个主题，它会自己搜资料、读论文、分析整理、最后写成一份完整的研究报告。
 
 一开始是想偷懒，每次看论文太费时间了，后来做着做着发现多Agent协作这块挺有意思的，就往深了做。
 
@@ -101,8 +101,6 @@ AutoResearch/
 
 ## 截图
 
-<!-- TODO: 加一张界面截图 -->
+<img width="1773" height="960" alt="image" src="https://github.com/user-attachments/assets/dbb0eb44-2bae-45c2-be62-1afb7813deaa" />
 
-## License
 
-MIT
