@@ -1,6 +1,5 @@
 from typing import Dict, Any, List, Optional
 from tools.search_tool import WebSearchTool, ArxivSearchTool
-from tools.rag_tool import RAGRetrieverTool
 from config.settings import Settings
 
 
@@ -11,11 +10,19 @@ class RetrieverAgent:
         self.settings = settings or Settings()
         self.web_search = WebSearchTool(max_results=self.settings.search_max_results)
         self.arxiv_search = ArxivSearchTool()
-        self.rag = RAGRetrieverTool(self.settings)
+        self.rag = None
         self.results_cache: Dict[str, Any] = {}
 
+    def _get_rag(self):
+        if self.rag is None:
+            try:
+                from tools.rag_tool import RAGRetrieverTool
+                self.rag = RAGRetrieverTool(self.settings)
+            except Exception:
+                self.rag = False
+        return self.rag if self.rag else None
+
     def retrieve(self, task_id: str, description: str, keywords: List[str]) -> Dict[str, Any]:
-        """执行多源检索。"""
         query = description
         all_results = {
             "task_id": task_id,
@@ -26,19 +33,20 @@ class RetrieverAgent:
             "combined_text": "",
         }
 
-        # 1. RAG本地检索
-        rag_ctx = self.rag.build_context(query, top_k=3)
-        all_results["rag_results"] = [{"context": rag_ctx}]
+        rag = self._get_rag()
+        if rag:
+            try:
+                rag_ctx = rag.build_context(query, top_k=3)
+                all_results["rag_results"] = [{"context": rag_ctx}]
+            except Exception:
+                pass
 
-        # 2. Web搜索
         web = self.web_search.run(query)
         all_results["web_results"] = web.get("results", [])
 
-        # 3. ArXiv学术搜索
         arxiv = self.arxiv_search.run(query, max_results=3)
         all_results["arxiv_results"] = arxiv.get("papers", [])
 
-        # 4. 获取关键网页内容
         fetched = []
         for r in all_results["web_results"][:3]:
             url = r.get("url", "")
@@ -48,10 +56,10 @@ class RetrieverAgent:
                     fetched.append({"url": url, "title": r.get("title", ""), "content": content})
         all_results["fetched_pages"] = fetched
 
-        # 5. 组合文本
         parts = []
-        if rag_ctx and rag_ctx != "[知识库中未找到相关信息]":
-            parts.append(f"## 知识库检索\n{rag_ctx}")
+        rag_ctx = all_results.get("rag_results", [{}])
+        if rag_ctx and rag_ctx[0].get("context", "") not in ["", "[知识库中未找到相关信息]"]:
+            parts.append(f"## 知识库检索\n{rag_ctx[0]['context']}")
         if all_results["web_results"]:
             web_text = "\n".join(f"- {r['title']}: {r['snippet']}" for r in all_results["web_results"][:5])
             parts.append(f"## 网络搜索结果\n{web_text}")
@@ -69,5 +77,7 @@ class RetrieverAgent:
         return all_results
 
     def index_to_rag(self, documents: List[Dict[str, str]]) -> int:
-        """将检索到的文档索引到RAG知识库。"""
-        return self.rag.index_documents(documents)
+        rag = self._get_rag()
+        if rag:
+            return rag.index_documents(documents)
+        return 0
